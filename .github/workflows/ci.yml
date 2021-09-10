@@ -18,5 +18,5 @@ jobs:
           java-version: '16'
       - name: build with maven
         run: mvn -B deploy
-        with:
+        env:
           GITHUB_TOKEN: ${{ secrets.GHKPG_TOKEN }}
