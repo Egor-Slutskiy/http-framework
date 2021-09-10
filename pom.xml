@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>pakages.floppy</groupId>
-    <artifactId>io</artifactId>
+    <artifactId>server</artifactId>
     <version>1.0</version>
 
     <properties>
