@@ -93,7 +93,7 @@ Content-Type: application/json
   "tags": [
     "java",
     "programming"
-  ],
+  ]
 }
 --WebAppBoundary
 Content-Disposition: form-data; name="avatar"; filename="logo.png"
@@ -104,9 +104,13 @@ Content-Type: image/png
 
 ###
 
-GET http://localhost:9999/courses
+GET http://localhost:8080/courses?test=8
 Username: admin
 
 ###
 
-POST http://localhost:9999/courses
+POST http://localhost:8080/courses
+Username: admin
+Content-Type: application/x-www-form-urlencoded
+
+body=123,123&body2=123

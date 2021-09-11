@@ -6,6 +6,8 @@ import pakages.floppy.http.framework.annotation.RequestMapping;
 import pakages.floppy.http.framework.guava.Bytes;
 import pakages.floppy.http.framework.resolver.argument.HandlerMethodArgumentResolver;
 import pakages.floppy.http.framework.exception.*;
+import pakages.floppy.http.framework.resolver.argument.RequestBodyHandlerMethodArgumentResolver;
+import pakages.floppy.http.framework.resolver.argument.RequestParamHandlerMethodArgumentResolver;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -43,13 +45,13 @@ public class Server {
     try {
       response.write(
           (
-              // language=HTTP
-              "HTTP/1.1 404 Not Found\r\n" +
-                  "Content-Length: " + body.length() + "\r\n" +
-                  "Content-Type: application/json\r\n" +
-                  "Connection: close\r\n" +
-                  "\r\n" +
-                  body
+          // language=HTTP
+          "HTTP/1.1 404 Not Found\r\n" +
+          "Content-Length: " + body.length() + "\r\n" +
+          "Content-Type: application/json\r\n" +
+          "Connection: close\r\n" +
+          "\r\n" +
+          body
           ).getBytes(StandardCharsets.UTF_8)
       );
     } catch (IOException e) {
@@ -62,19 +64,39 @@ public class Server {
     try {
       response.write(
           (
-              // language=HTTP
-              "HTTP/1.1 500 Internal Server Error\r\n" +
-                  "Content-Length: " + body.length() + "\r\n" +
-                  "Content-Type: application/json\r\n" +
-                  "Connection: close\r\n" +
-                  "\r\n" +
-                  body
+          // language=HTTP
+          "HTTP/1.1 500 Internal Server Error\r\n" +
+          "Content-Length: " + body.length() + "\r\n" +
+          "Content-Type: application/json\r\n" +
+          "Connection: close\r\n" +
+          "\r\n" +
+          body
           ).getBytes(StandardCharsets.UTF_8)
       );
     } catch (IOException e) {
       throw new RequestHandleException(e);
     }
   };
+
+  private final Handler badRequestHandler = ((request, response) -> {
+    final var body = "{\"status\": \"error\"}" +
+                      "\n{\"message\": \"Bad request\"}";
+    try {
+      response.write(
+              (
+              "HTTP/1.1 500 Internal Server Error\r\n" +
+              "Content-Length: " + body.length() + "\r\n" +
+              "Content-Type: application/json\r\n" +
+              "Connection: close\r\n" +
+              "\r\n" +
+              body
+              ).getBytes(StandardCharsets.UTF_8)
+      );
+    } catch (IOException e) {
+      throw new RequestHandleException(e);
+    }
+  });
+
   private final List<HandlerMethodArgumentResolver> argumentResolvers = new ArrayList<>();
 
   public void get(String path, Handler handler) {
@@ -194,13 +216,49 @@ public class Server {
         }
 
         final var requestLineParts = new String(buffer, 0, requestLineEndIndex).trim().split(" ");
+        log.log(Level.INFO, "Request line parts: " + Arrays.toString(requestLineParts));
         if (requestLineParts.length != 3) {
           throw new MalformedRequestException("request line must contains 3 parts");
         }
 
         final var method = requestLineParts[0];
+        String params = null;
+        String uri;
+
         // TODO: uri split ? -> URLDecoder
-        final var uri = requestLineParts[1];
+        if(requestLineParts[1].indexOf('?')!=-1){
+          final var splited = requestLineParts[1].split("\\?");
+          params = splited[1];
+          uri = splited[0];
+        } else{
+          uri = requestLineParts[1];
+        }
+
+        log.log(Level.INFO, "URI: " + uri);
+
+        final var query = new HashMap<String, List<String>>();
+        if( params!=null ){
+          if(params.indexOf('&')!=-1){
+            final var params_splited = params.split("&");
+            for(String part:params_splited){
+              final var param_kv = part.split("=");
+              final List<String> param_values = new ArrayList<>();
+              if(param_kv[1].indexOf('%') != -1){
+                param_values.addAll(Arrays.asList(param_kv[1].split("%2C")));
+              }else{
+                param_values.add(param_kv[1]);
+              }
+              query.put(param_kv[0], param_values);
+            }
+          }else{
+            final var params_splited = params.split("=");
+            if(params_splited.length < 2){
+              throw new MalformedRequestException();
+            }else{
+              query.put(params_splited[0], List.of(params_splited[1]));
+            }
+          }
+        }
 
         final var headersEndIndex = Bytes.indexOf(buffer, CRLFCRLF, requestLineEndIndex, read) + CRLFCRLF.length;
         if (headersEndIndex == 3) {
@@ -226,6 +284,7 @@ public class Server {
           headers.put(headerParts.get(0), headerParts.get(1));
           lastIndex = headerEndIndex;
         }
+        log.log(Level.INFO, "Headers: " + headers);
 
         final var contentLength = Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
 
@@ -235,15 +294,31 @@ public class Server {
 
         in.reset();
         in.skipNBytes(headersEndIndex);
-        final var body = in.readNBytes(contentLength);
+
+        final var contentType = String.valueOf(headers.getOrDefault("Content-Type", "text/plain"));
+
+        final var body = new HashMap<String,List<String>>();
+        final var body_test = new String(in.readNBytes(contentLength), StandardCharsets.UTF_8) ;
+        log.log(Level.INFO, "Body: " + body_test);
+        if(contentType.equals("application/x-www-form-urlencoded")){
+          for(String part:body_test.split("&")){
+            final var body_kv = part.split("=");
+            if(body_kv.length<2){
+              throw new MalformedRequestException();
+            }
+            final List<String> values = new ArrayList<>(Arrays.asList(body_kv[1].split("%2C")));
+            body.put(body_kv[0], values);
+          }
+        }
 
         // TODO: annotation monkey
         final var request = Request.builder()
-            .method(method)
-            .path(uri)
-            .headers(headers)
-            .body(body)
-            .build();
+                .method(method)
+                .path(uri)
+                .headers(headers)
+                .query(query)
+                .body(body)
+                .build();
 
         final var response = out;
 
@@ -265,6 +340,7 @@ public class Server {
 
               final var argument = argumentResolver.resolveArgument(parameter, request, response);
               arguments.add(argument);
+
               resolved = true;
               break;
             }
@@ -274,6 +350,21 @@ public class Server {
           }
 
           invokableMethod.invoke(invokableHandler, arguments.toArray());
+        }catch (MalformedRequestException e){
+          // language=HTML
+          final var html = "<h1>Mailformed request</h1>";
+          out.write(
+                  (
+                          // language=HTTP
+                          "HTTP/1.1 400 Bad Request\r\n" +
+                                  "Server: nginx\r\n" +
+                                  "Content-Length: " + html.length() + "\r\n" +
+                                  "Content-Type: text/html; charset=UTF-8\r\n" +
+                                  "Connection: close\r\n" +
+                                  "\r\n" +
+                                  html
+                  ).getBytes(StandardCharsets.UTF_8)
+          );
         } catch (Exception e) {
           internalErrorHandler.handle(request, response);
         }
