@@ -77,26 +77,16 @@ Content-Type: image/png
 
 ###
 
-POST http://localhost:9999/coursar/search?q=Java PRO
+POST http://localhost:8080/courses
+Username: admin
 Content-Type: multipart/form-data; boundary=WebAppBoundary
 
 --WebAppBoundary
-Content-Disposition: form-data; name="q"
+Content-Disposition: form-data; name="test"
 
 Java Advanced
 --WebAppBoundary
-Content-Disposition: form-data; name="data"
-Content-Type: application/json
-
-{
-  "name": "...",
-  "tags": [
-    "java",
-    "programming"
-  ]
-}
---WebAppBoundary
-Content-Disposition: form-data; name="avatar"; filename="logo.png"
+Content-Disposition: form-data; name="body"; filename="logo.png"
 Content-Type: image/png
 
 < ./logo.png

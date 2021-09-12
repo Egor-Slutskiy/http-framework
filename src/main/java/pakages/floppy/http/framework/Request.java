@@ -11,8 +11,9 @@ import java.util.Map;
 public class Request {
   String method;
   String path;
+  String params;
   Map<String, String> headers;
   Map<String, List<String>> query;
-  Map<String, List<String>> body;
-
+  Map<String, List<String>> form;
+  byte[] multipart;
 }

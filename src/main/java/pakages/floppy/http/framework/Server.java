@@ -6,8 +6,6 @@ import pakages.floppy.http.framework.annotation.RequestMapping;
 import pakages.floppy.http.framework.guava.Bytes;
 import pakages.floppy.http.framework.resolver.argument.HandlerMethodArgumentResolver;
 import pakages.floppy.http.framework.exception.*;
-import pakages.floppy.http.framework.resolver.argument.RequestBodyHandlerMethodArgumentResolver;
-import pakages.floppy.http.framework.resolver.argument.RequestParamHandlerMethodArgumentResolver;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -19,6 +17,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -216,7 +215,6 @@ public class Server {
         }
 
         final var requestLineParts = new String(buffer, 0, requestLineEndIndex).trim().split(" ");
-        log.log(Level.INFO, "Request line parts: " + Arrays.toString(requestLineParts));
         if (requestLineParts.length != 3) {
           throw new MalformedRequestException("request line must contains 3 parts");
         }
@@ -233,8 +231,6 @@ public class Server {
         } else{
           uri = requestLineParts[1];
         }
-
-        log.log(Level.INFO, "URI: " + uri);
 
         final var query = new HashMap<String, List<String>>();
         if( params!=null ){
@@ -284,7 +280,6 @@ public class Server {
           headers.put(headerParts.get(0), headerParts.get(1));
           lastIndex = headerEndIndex;
         }
-        log.log(Level.INFO, "Headers: " + headers);
 
         final var contentLength = Integer.parseInt(headers.getOrDefault("Content-Length", "0"));
 
@@ -294,11 +289,13 @@ public class Server {
 
         in.reset();
         in.skipNBytes(headersEndIndex);
+        byte[] multipart = in.readNBytes(contentLength);
 
         final var contentType = String.valueOf(headers.getOrDefault("Content-Type", "text/plain"));
 
         final var body = new HashMap<String,List<String>>();
-        final var body_test = new String(in.readNBytes(contentLength), StandardCharsets.UTF_8) ;
+
+        final var body_test = new String(multipart, StandardCharsets.UTF_8) ;
         log.log(Level.INFO, "Body: " + body_test);
         if(contentType.equals("application/x-www-form-urlencoded")){
           for(String part:body_test.split("&")){
@@ -317,7 +314,8 @@ public class Server {
                 .path(uri)
                 .headers(headers)
                 .query(query)
-                .body(body)
+                .form(body)
+                .multipart(multipart)
                 .build();
 
         final var response = out;
@@ -385,10 +383,12 @@ public class Server {
         );
       } catch (NoSuchMethodException e) {
         e.printStackTrace();
+        log.log(Level.INFO, e.getMessage());
         // TODO:
       }
     } catch (IOException e) {
       e.printStackTrace();
+      log.log(Level.INFO, e.getMessage());
       // TODO:
     }
   }
