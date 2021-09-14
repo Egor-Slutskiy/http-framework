@@ -12,12 +12,12 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -34,6 +34,16 @@ public class Server {
     thread.setDaemon(true);
     return thread;
   });
+  private ServerSocket serverSocket;
+
+  {
+    try {
+      serverSocket = new ServerSocket();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
   // GET, "/search", handler
   private final Map<String, Map<String, HandlerMethod>> routes = new HashMap<>();
   // 404 Not Found ->
@@ -153,45 +163,34 @@ public class Server {
   }
 
   public void listen(int port) {
-    try (final ServerSocket serverSocket = new ServerSocket(port)){
+    try {
       log.log(Level.INFO, "server started at port: " + serverSocket.getLocalPort());
-      while(!isClosed()){
-        Future<Socket> acceptThread = service.submit(() -> {
-          try {
-            return serverSocket.accept();
-          } catch (IOException e) {
-            throw new ServerException(e);
-          }});
-        while(true){
-          if(isClosed() | acceptThread.isDone()){
-            break;
-          }
-        }
-        if(!isClosed()) {
-          try {
-            Socket socket = acceptThread.get();
-            service.submit(() -> handle(socket));
-          } catch (InterruptedException | ExecutionException e) {
-            throw new ServerException(e);
-          }
-        }
-      }
+      serverSocket.bind(new InetSocketAddress(port));
+      final var socket = serverSocket.accept();
+      service.submit(() -> handle(socket));
     } catch (IOException e) {
-      throw new ServerException(e);
+      e.printStackTrace();
     }
   }
 
   public void stop() {
     synchronized (closeLock){
-      if(isClosed()){
-        if(service.isShutdown()){
+      try{
+        if(isClosed()){
+          if(service.isShutdown()){
+            service.shutdownNow();
+            serverSocket.close();
+
+          }
+          return;
+        }
+        closed = true;
+        serverSocket.close();
+        if(service.isShutdown()) {
           service.shutdownNow();
         }
-        return;
-      }
-      closed = true;
-      if(service.isShutdown()){
-        service.shutdownNow();
+      } catch (IOException e) {
+        e.printStackTrace();
       }
     }
   }
