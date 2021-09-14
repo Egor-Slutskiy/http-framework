@@ -162,7 +162,11 @@ public class Server {
           } catch (IOException e) {
             throw new ServerException(e);
           }});
-        while(!isClosed() & !acceptThread.isDone()){}
+        while(true){
+          if(isClosed() | acceptThread.isDone()){
+            break;
+          }
+        }
         if(!isClosed()) {
           try {
             Socket socket = acceptThread.get();
