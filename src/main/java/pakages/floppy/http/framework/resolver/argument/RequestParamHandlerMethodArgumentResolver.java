@@ -31,10 +31,10 @@ public class RequestParamHandlerMethodArgumentResolver implements HandlerMethodA
 
         final Map<String,List<String>> query = new HashMap<>();
         final List<String> values = new ArrayList<>();
-        final List<String> query_val = request.getQuery().get(annotation.value());
-        for(String value: query_val){
-            final var splited = value.split("%2C");
-            values.addAll(Arrays.asList(splited));
+        final List<String> queryVal = request.getQuery().get(annotation.value());
+        for(String value: queryVal){
+            final var valuesArr = value.split("%2C");
+            values.addAll(Arrays.asList(valuesArr));
         }
         query.put(annotation.value(), values);
 

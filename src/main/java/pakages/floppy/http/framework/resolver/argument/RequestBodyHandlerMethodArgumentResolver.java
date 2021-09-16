@@ -59,9 +59,9 @@ public class RequestBodyHandlerMethodArgumentResolver implements HandlerMethodAr
             final String boundary = str.split("\r\n")[0];
             final String[] parts = str.split(boundary + "\r\n");
             for(int i = 1; i < parts.length; i++){
-                String[] content_data = parts[i].split("\r\n\r\n");
-                byte[] data = content_data[1].replace("\r\n", "").getBytes();
-                Part part = new Part(content_data[0], data);
+                String[] contentData = parts[i].split("\r\n\r\n");
+                byte[] data = contentData[1].replace("\r\n", "").getBytes();
+                Part part = new Part(contentData[0], data);
                 if(part.getName().equals(annotation.value())){
                     multipart.put(part.getName(), part);
                 }

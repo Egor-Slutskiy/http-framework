@@ -150,12 +150,6 @@ public class Server {
     } catch (NoSuchMethodException e) {
       throw new HandlerRegistrationException(e);
     }
-//    final var map = routes.get(method);
-//    if (map != null) {
-//      map.put(path, handler);
-//      return;
-//    }
-//    routes.put(method, new HashMap<>(Map.of(path, handler)));
   }
 
   public void addArgumentResolver(HandlerMethodArgumentResolver... resolvers) {
@@ -177,16 +171,15 @@ public class Server {
     synchronized (closeLock){
       try{
         if(isClosed()){
-          if(service.isShutdown()){
+          if(!service.isShutdown()){
             service.shutdownNow();
-            serverSocket.close();
-
           }
+          serverSocket.close();
           return;
         }
         closed = true;
         serverSocket.close();
-        if(service.isShutdown()) {
+        if(!service.isShutdown()) {
           service.shutdownNow();
         }
       } catch (IOException e) {
@@ -238,23 +231,23 @@ public class Server {
         final var query = new HashMap<String, List<String>>();
         if( params!=null ){
           if(params.indexOf('&')!=-1){
-            final var params_splited = params.split("&");
-            for(String part:params_splited){
-              final var param_kv = part.split("=");
-              final List<String> param_values = new ArrayList<>();
-              if(param_kv[1].indexOf('%') != -1){
-                param_values.addAll(Arrays.asList(param_kv[1].split("%2C")));
+            final var paramsArray = params.split("&");
+            for(String part:paramsArray){
+              final var paramKV = part.split("=");
+              final List<String> paramValues = new ArrayList<>();
+              if(paramKV[1].indexOf('%') != -1){
+                paramValues.addAll(Arrays.asList(paramKV[1].split("%2C")));
               }else{
-                param_values.add(param_kv[1]);
+                paramValues.add(paramKV[1]);
               }
-              query.put(param_kv[0], param_values);
+              query.put(paramKV[0], paramValues);
             }
           }else{
-            final var params_splited = params.split("=");
-            if(params_splited.length < 2){
+            final var paramsArray = params.split("=");
+            if(paramsArray.length < 2){
               throw new MalformedRequestException();
             }else{
-              query.put(params_splited[0], List.of(params_splited[1]));
+              query.put(paramsArray[0], List.of(paramsArray[1]));
             }
           }
         }
@@ -292,22 +285,21 @@ public class Server {
 
         in.reset();
         in.skipNBytes(headersEndIndex);
-        byte[] multipart = in.readNBytes(contentLength);
+        byte[] bodyByteArr = in.readNBytes(contentLength);
 
         final var contentType = String.valueOf(headers.getOrDefault("Content-Type", "text/plain"));
 
-        final var body = new HashMap<String,List<String>>();
+        final var bodyMap = new HashMap<String,List<String>>();
 
-        final var body_test = new String(multipart, StandardCharsets.UTF_8) ;
-        log.log(Level.INFO, "Body: " + body_test);
+        final var body = new String(bodyByteArr, StandardCharsets.UTF_8) ;
         if(contentType.equals("application/x-www-form-urlencoded")){
-          for(String part:body_test.split("&")){
+          for(String part:body.split("&")){
             final var body_kv = part.split("=");
             if(body_kv.length<2){
               throw new MalformedRequestException();
             }
             final List<String> values = new ArrayList<>(Arrays.asList(body_kv[1].split("%2C")));
-            body.put(body_kv[0], values);
+            bodyMap.put(body_kv[0], values);
           }
         }
 
@@ -317,8 +309,8 @@ public class Server {
                 .path(uri)
                 .headers(headers)
                 .query(query)
-                .form(body)
-                .multipart(multipart)
+                .form(bodyMap)
+                .multipart(bodyByteArr)
                 .build();
 
         final var response = out;
