@@ -36,14 +36,6 @@ public class Server {
   });
   private ServerSocket serverSocket;
 
-  {
-    try {
-      serverSocket = new ServerSocket();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
   // GET, "/search", handler
   private final Map<String, Map<String, HandlerMethod>> routes = new HashMap<>();
   // 404 Not Found ->
@@ -157,11 +149,21 @@ public class Server {
   }
 
   public void listen(int port) {
+    createServerSocket(port);
     try {
-      log.log(Level.INFO, "server started at port: " + serverSocket.getLocalPort());
-      serverSocket.bind(new InetSocketAddress(port));
-      final var socket = serverSocket.accept();
-      service.submit(() -> handle(socket));
+      while(!isClosed()) {
+        log.log(Level.INFO, "server started at port: " + serverSocket.getLocalPort());
+        final var socket = serverSocket.accept();
+        service.submit(() -> handle(socket));
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void createServerSocket(int port){
+    try {
+      serverSocket = new ServerSocket(port);
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -216,41 +218,11 @@ public class Server {
         }
 
         final var method = requestLineParts[0];
-        String params = null;
-        String uri;
 
-        // TODO: uri split ? -> URLDecoder
-        if(requestLineParts[1].indexOf('?')!=-1){
-          final var splited = requestLineParts[1].split("\\?");
-          params = splited[1];
-          uri = splited[0];
-        } else{
-          uri = requestLineParts[1];
-        }
-
-        final var query = new HashMap<String, List<String>>();
-        if( params!=null ){
-          if(params.indexOf('&')!=-1){
-            final var paramsArray = params.split("&");
-            for(String part:paramsArray){
-              final var paramKV = part.split("=");
-              final List<String> paramValues = new ArrayList<>();
-              if(paramKV[1].indexOf('%') != -1){
-                paramValues.addAll(Arrays.asList(paramKV[1].split("%2C")));
-              }else{
-                paramValues.add(paramKV[1]);
-              }
-              query.put(paramKV[0], paramValues);
-            }
-          }else{
-            final var paramsArray = params.split("=");
-            if(paramsArray.length < 2){
-              throw new MalformedRequestException();
-            }else{
-              query.put(paramsArray[0], List.of(paramsArray[1]));
-            }
-          }
-        }
+        URLDecoder urlDecoder = new URLDecoder();
+        urlDecoder.decode(requestLineParts[1]);
+        final Map<String, List<String>> query = urlDecoder.getQuery();
+        final String uri = urlDecoder.getUrl();
 
         final var headersEndIndex = Bytes.indexOf(buffer, CRLFCRLF, requestLineEndIndex, read) + CRLFCRLF.length;
         if (headersEndIndex == 3) {

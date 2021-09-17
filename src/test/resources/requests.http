@@ -57,6 +57,7 @@ Content-Type: application/json
 ###
 
 POST http://localhost:9999/coursar/search?q=Java PRO
+
 Content-Type: application/json
 
 {
@@ -94,7 +95,7 @@ Content-Type: image/png
 
 ###
 
-GET http://localhost:8080/courses?test=8
+GET http://localhost:8080/courses?test=8&test2=321
 Username: admin
 
 ###
