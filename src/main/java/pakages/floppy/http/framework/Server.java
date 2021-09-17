@@ -266,12 +266,12 @@ public class Server {
         final var body = new String(bodyByteArr, StandardCharsets.UTF_8) ;
         if(contentType.equals("application/x-www-form-urlencoded")){
           for(String part:body.split("&")){
-            final var body_kv = part.split("=");
-            if(body_kv.length<2){
+            final var bodyKV = part.split("=");
+            if(bodyKV.length<2){
               throw new MalformedRequestException();
             }
-            final List<String> values = new ArrayList<>(Arrays.asList(body_kv[1].split("%2C")));
-            bodyMap.put(body_kv[0], values);
+            final List<String> values = new ArrayList<>(Arrays.asList(bodyKV[1].split("%2C")));
+            bodyMap.put(bodyKV[0], values);
           }
         }
 
